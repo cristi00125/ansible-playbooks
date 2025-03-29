@@ -1,0 +1,16 @@
+---
+- name: Ping suspicious IP from DVWA
+  hosts: all
+  gather_facts: no
+
+  vars:
+    source_ip: "127.0.0.1"
+
+  tasks:
+    - name: Ping the attacker IP
+      shell: "ping -c 4 {{ source_ip }}"
+      register: result
+
+    - name: Show ping output
+      debug:
+        var: result.stdout
