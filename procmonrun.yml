@@ -1,0 +1,8 @@
+- name: Run Procmon Monitor Script
+  hosts: all
+  tasks:
+    - name: Run Python script for Procmon logging
+      win_shell: |
+        python "C:\Users\PeterC\Desktop\Procmon\monitor.py"
+      args:
+        executable: cmd.exe
