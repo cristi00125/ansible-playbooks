@@ -3,6 +3,6 @@
   tasks:
     - name: Run Python script for Procmon logging
       win_shell: |
-        python "C:\Users\PeterC\Desktop\Procmon\monitor.py"
+        win_shell: '"C:\Users\PeterC\AppData\Local\Programs\Python\Python313\python.exe" "C:\Users\PeterC\Desktop\Procmon\monitor.py"'
       args:
         executable: cmd.exe
