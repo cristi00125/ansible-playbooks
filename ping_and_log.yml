@@ -1,0 +1,19 @@
+- name: Ping external IP and log the result
+  hosts: all
+  tasks:
+    - name: Ping 192.168.190.200 and capture result
+      win_shell: |
+        ping 192.168.190.200 -n 4
+      register: ping_output
+
+    - name: Write ping results to a log file
+      win_copy:
+        content: |
+          Ping to 192.168.190.200
+          -------------------------
+          {{ ping_output.stdout }}
+
+          Errors (if any):
+          -------------------------
+          {{ ping_output.stderr }}
+        dest: C:\ping_log.txt
