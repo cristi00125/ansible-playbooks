@@ -1,5 +1,7 @@
 - name: Run Procmon Monitor Script
   hosts: all
   tasks:
-    - name: Run Python script for Procmon logging
-      win_shell: '"C:\Users\PeterC\AppData\Local\Programs\Python\Python313\python.exe" "C:\Users\PeterC\Desktop\Procmon\monitor.py"'
+    - name: Run Python script using full path
+      win_command: >
+        C:\Users\PeterC\AppData\Local\Programs\Python\Python313\python.exe
+        C:\Users\PeterC\Desktop\Procmon\monitor.py
