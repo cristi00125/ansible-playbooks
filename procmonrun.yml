@@ -1,7 +1,15 @@
-- name: Run Procmon Monitor Script
+- name: Run Procmon Monitoring Script via Python
   hosts: all
+  gather_facts: false
+
   tasks:
-    - name: Run Python script using full path
+    - name: Run monitor.py using Python 3.13
       win_command: >
-        C:\Users\PeterC\AppData\Local\Programs\Python\Python313\python.exe
-        C:\Users\PeterC\Desktop\Procmon\monitor.py
+        C:\Users\ansible\AppData\Local\Programs\Python\Python313\python.exe monitor.py
+      args:
+        chdir: C:\Users\ansible\Desktop\Procmon
+      register: procmon_output
+
+    - name: Show output (for logging/debugging)
+      debug:
+        var: procmon_output.stdout_lines
