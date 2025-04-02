@@ -78,8 +78,8 @@
         # 'item.item' refers back to the original item from the 'changes' loop.
         label: "{{ item.item.name }}"
       delegate_to: localhost # This task runs on the controller machine
-      when:
-        # Only run this save task if:
-        - item.stdout is defined        # The command produced standard output
-        - item.stdout | length > 0    # The standard output is not empty
-        - '"success": true' in item.stdout # The output contains the success flag from your script
+      # Corrected 'when' condition as a single string
+      when: >
+        item.stdout is defined and
+        (item.stdout | length > 0) and
+        '"success": true' in item.stdout
