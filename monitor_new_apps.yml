@@ -27,15 +27,14 @@
 
     # --- Task to display the results in Ansible output ---
 
-    - name: Show successful API results
+    - name: Show ALL API results (including potential errors/empty)
       # Prints the standard output (JSON string) from the script to the console.
       debug:
-        msg: "{{ item.stdout }}" # Display the raw JSON string from the script
+        msg: "{{ item.stdout | default('') }}" # Display the raw output, default to empty string if undefined
       # Loops over the results captured by 'register: monitor_output'.
       loop: "{{ monitor_output.results }}"
       loop_control:
         # Display app name in Ansible output for this task.
         # 'item.item' refers back to the original item from the 'changes' loop.
         label: "{{ item.item.name }}"
-      # Only display output for successful runs (single-line condition)
-      when: item.stdout is defined and (item.stdout | length > 0) and ('"success": true' in item.stdout)
+      # No 'when:' condition here - will run for every item
