@@ -2,7 +2,7 @@
   hosts: all
   gather_facts: false
   vars:
-    monitor_script: "C:\\Users\\ansible\\Desktop\\monitorsingle.py"
+    monitor_script: "C:\\Users\\ansible\\Desktop\\Procmon\\monitorsingle.py"
     python_path: "C:\\Users\\ansible\\AppData\\Local\\Programs\\Python\\Python313\\python.exe"
 
   tasks:
