@@ -1,55 +1,85 @@
 - name: Monitor new/updated apps for API calls and Log Results
-  hosts: all
+  hosts: all # Targets your Windows hosts defined in inventory
   gather_facts: false
   vars:
+    # Paths on the remote Windows target host
     monitor_script: "C:\\Users\\ansible\\Desktop\\Procmon\\monitorsingle.py"
     python_path: "C:\\Users\\ansible\\AppData\\Local\\Programs\\Python\\Python313\\python.exe"
+
+    # --- Paths on the Ansible Controller machine ---
+    # Where the results will be saved
     log_directory_on_controller: "/home/peter/Desktop/Scripts/Logs"
-    # Define the path to the input JSON file relative to the playbook
-    changes_file_path: "WindowsDesktop_changes.json"
+    # Where the input JSON file is located
+    changes_file_path: "/home/peter/Desktop/Scripts/Changes/WindowsDesktop_changes.json"
 
   tasks:
 
-    # Load the 'changes' variable from the JSON file
-    - name: Load changes data from JSON file
-      include_vars:
-        file: "{{ changes_file_path }}"
-        name: changes_from_file # Load into a temporary variable name
+    # --- Tasks running on the Controller (localhost) ---
 
-    # Set the 'changes' fact based on the loaded data
-    # This ensures the loop uses the data correctly.
-    # The 'default' ensures 'changes' exists even if the file is empty, though it shouldn't be.
-    - name: Set changes fact for loop
+    - name: Load changes data from JSON file on controller
+      # Reads the specified JSON file and loads its content.
+      include_vars:
+        file: "{{ changes_file_path }}" # Path on the controller
+        name: changes_from_file # Loads data into this temporary variable name
+      delegate_to: localhost
+      run_once: true # Only need to load the file once per playbook run
+
+    - name: Set 'changes' variable from loaded file data
+      # Takes the data loaded above and sets it as a fact named 'changes',
+      # which the main loop will use.
       set_fact:
         changes: "{{ changes_from_file | default([]) }}"
-      run_once: true # Only need to load and set this once
-
-    - name: Ensure log directory exists on controller
-      file:
-        path: "{{ log_directory_on_controller }}"
-        state: directory
       delegate_to: localhost
       run_once: true
 
+    - name: Ensure log directory exists on controller
+      # Creates the target log directory if it doesn't exist.
+      file:
+        path: "{{ log_directory_on_controller }}"
+        state: directory
+        # You might need to set owner/group/mode if default permissions are insufficient
+        # owner: peter
+        # group: peter
+        # mode: '0755'
+      delegate_to: localhost
+      run_once: true
+
+    # --- Tasks running on the remote Windows host(s) ---
+
     - name: Monitor API calls for each changed app
+      # Executes the python script on the remote Windows host for each app.
       win_command: >
         "{{ python_path }}" "{{ monitor_script }}" "{{ item.name }}"
-      register: monitor_output
-      # The loop now uses the 'changes' fact set above
-      loop: "{{ changes }}" # No need for default here if set_fact runs
+      register: monitor_output # Captures the output (stdout, stderr, rc)
+      # Loops over the 'changes' list loaded from the JSON file.
+      loop: "{{ changes }}"
       loop_control:
-        label: "{{ item.name }}"
-      changed_when: false
+        label: "{{ item.name }}" # Display app name in Ansible output for this task
+      changed_when: false # This task doesn't change the target's state
+      # Optional: fail if the script reports failure
+      # failed_when: "'\"success\": false' in item.stdout"
+
+    # --- Task running back on the Controller (localhost) ---
 
     - name: Save successful API results to controller log file
+      # Takes the JSON output from the script (if successful) and saves it to a file.
       copy:
-        content: "{{ item.stdout }}"
+        content: "{{ item.stdout }}" # The JSON string output by the script
+        # Destination filename on the controller, sanitizing the app name
         dest: "{{ log_directory_on_controller }}/{{ item.item.name | regex_replace('[^a-zA-Z0-9_.-]+', '_') }}.json"
+        # Set file permissions if needed
+        # owner: peter
+        # group: peter
+        # mode: '0644'
+      # Loops over the results captured by 'register: monitor_output'.
       loop: "{{ monitor_output.results }}"
       loop_control:
+        # Display app name in Ansible output for this task.
+        # 'item.item' refers back to the original item from the 'changes' loop.
         label: "{{ item.item.name }}"
-      delegate_to: localhost
+      delegate_to: localhost # This task runs on the controller machine
       when:
-        - item.stdout is defined
-        - item.stdout | length > 0
-        - '"success": true' in item.stdout
+        # Only run this save task if:
+        - item.stdout is defined        # The command produced standard output
+        - item.stdout | length > 0    # The standard output is not empty
+        - '"success": true' in item.stdout # The output contains the success flag from your script
