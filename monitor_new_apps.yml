@@ -10,8 +10,9 @@
     # Where the results will be saved
     log_directory_on_controller: "/home/peter/Desktop/Scripts/Logs"
     # Where the input JSON file is located
-    changes_file_path: "/home/peter/Desktop/Scripts/Changes/WindowsDesktop_changes.json"
+    changes_file_path: "/tmp/WindowsDesktop_changes.json"
 
+    
   tasks:
 
     # --- Tasks running on the Controller (localhost) ---
