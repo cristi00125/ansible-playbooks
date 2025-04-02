@@ -4,23 +4,39 @@
   vars:
     monitor_script: "C:\\Users\\ansible\\Desktop\\Procmon\\monitorsingle.py"
     python_path: "C:\\Users\\ansible\\AppData\\Local\\Programs\\Python\\Python313\\python.exe"
-    # Define where logs will be saved on the Ansible controller machine 
     log_directory_on_controller: "/home/peter/Desktop/Scripts/Logs"
+    # Define the path to the input JSON file relative to the playbook
+    changes_file_path: "WindowsDesktop_changes.json"
 
   tasks:
+
+    # Load the 'changes' variable from the JSON file
+    - name: Load changes data from JSON file
+      include_vars:
+        file: "{{ changes_file_path }}"
+        name: changes_from_file # Load into a temporary variable name
+
+    # Set the 'changes' fact based on the loaded data
+    # This ensures the loop uses the data correctly.
+    # The 'default' ensures 'changes' exists even if the file is empty, though it shouldn't be.
+    - name: Set changes fact for loop
+      set_fact:
+        changes: "{{ changes_from_file | default([]) }}"
+      run_once: true # Only need to load and set this once
 
     - name: Ensure log directory exists on controller
       file:
         path: "{{ log_directory_on_controller }}"
         state: directory
-      delegate_to: localhost 
+      delegate_to: localhost
       run_once: true
 
     - name: Monitor API calls for each changed app
       win_command: >
         "{{ python_path }}" "{{ monitor_script }}" "{{ item.name }}"
       register: monitor_output
-      loop: "{{ changes | default([]) }}"
+      # The loop now uses the 'changes' fact set above
+      loop: "{{ changes }}" # No need for default here if set_fact runs
       loop_control:
         label: "{{ item.name }}"
       changed_when: false
@@ -37,7 +53,3 @@
         - item.stdout is defined
         - item.stdout | length > 0
         - '"success": true' in item.stdout
-
-    #     msg: "Processed {{ monitor_output.results | length }} applications. Check '{{ log_directory_on_controller }}' for logs."
-    #   run_once: true
-    #   delegate_to: localhost
