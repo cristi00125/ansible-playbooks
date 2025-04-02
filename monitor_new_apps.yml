@@ -11,11 +11,10 @@
       win_command: >
         {{ python_path }} {{ monitor_script }} "{{ item.name }}"
       register: monitor_output
-      loop: "{{ changes[inventory_hostname] | default([]) }}"
+      loop: "{{ changes | default([]) }}"
       loop_control:
         label: "{{ item.name }}"
       changed_when: false
-      failed_when: false
 
     - name: Show API results
       debug:
