@@ -1,49 +1,14 @@
-- name: Monitor new/updated apps for API calls and Log Results
+- name: Monitor new/updated apps for API calls and Show Results
   hosts: all # Targets your Windows hosts defined in inventory
   gather_facts: false
   vars:
     # Paths on the remote Windows target host
     monitor_script: "C:\\Users\\ansible\\Desktop\\Procmon\\monitorsingle.py"
     python_path: "C:\\Users\\ansible\\AppData\\Local\\Programs\\Python\\Python313\\python.exe"
+    # No 'changes_file_path' needed here if using extra_vars
 
-    # --- Paths on the Ansible Controller machine ---
-    # Where the results will be saved
-    log_directory_on_controller: "/home/peter/Desktop/Scripts/Logs"
-    # Where the input JSON file is located
-    changes_file_path: "/tmp/WindowsDesktop_changes.json"
-
-    
   tasks:
-
-    # --- Tasks running on the Controller (localhost) ---
-
-    - name: Load changes data from JSON file on controller
-      # Reads the specified JSON file and loads its content.
-      include_vars:
-        file: "{{ changes_file_path }}" # Path on the controller
-        name: changes_from_file # Loads data into this temporary variable name
-      delegate_to: localhost
-      run_once: true # Only need to load the file once per playbook run
-
-    - name: Set 'changes' variable from loaded file data
-      # Takes the data loaded above and sets it as a fact named 'changes',
-      # which the main loop will use.
-      set_fact:
-        changes: "{{ changes_from_file | default([]) }}"
-      delegate_to: localhost
-      run_once: true
-
-    - name: Ensure log directory exists on controller
-      # Creates the target log directory if it doesn't exist.
-      file:
-        path: "{{ log_directory_on_controller }}"
-        state: directory
-        # You might need to set owner/group/mode if default permissions are insufficient
-        # owner: peter
-        # group: peter
-        # mode: '0755'
-      delegate_to: localhost
-      run_once: true
+    # No file loading tasks needed here
 
     # --- Tasks running on the remote Windows host(s) ---
 
@@ -52,35 +17,25 @@
       win_command: >
         "{{ python_path }}" "{{ monitor_script }}" "{{ item.name }}"
       register: monitor_output # Captures the output (stdout, stderr, rc)
-      # Loops over the 'changes' list loaded from the JSON file.
-      loop: "{{ changes }}"
+      # Loops directly over the 'changes' variable (passed via extra_vars)
+      loop: "{{ changes | default([]) }}" # Use default just in case extra_vars isn't passed
       loop_control:
         label: "{{ item.name }}" # Display app name in Ansible output for this task
       changed_when: false # This task doesn't change the target's state
       # Optional: fail if the script reports failure
       # failed_when: "'\"success\": false' in item.stdout"
 
-    # --- Task running back on the Controller (localhost) ---
+    # --- Task to display the results in Ansible output ---
 
-    - name: Save successful API results to controller log file
-      # Takes the JSON output from the script (if successful) and saves it to a file.
-      copy:
-        content: "{{ item.stdout }}" # The JSON string output by the script
-        # Destination filename on the controller, sanitizing the app name
-        dest: "{{ log_directory_on_controller }}/{{ item.item.name | regex_replace('[^a-zA-Z0-9_.-]+', '_') }}.json"
-        # Set file permissions if needed
-        # owner: peter
-        # group: peter
-        # mode: '0644'
+    - name: Show successful API results
+      # Prints the standard output (JSON string) from the script to the console.
+      debug:
+        msg: "{{ item.stdout }}" # Display the raw JSON string from the script
       # Loops over the results captured by 'register: monitor_output'.
       loop: "{{ monitor_output.results }}"
       loop_control:
         # Display app name in Ansible output for this task.
         # 'item.item' refers back to the original item from the 'changes' loop.
         label: "{{ item.item.name }}"
-      delegate_to: localhost # This task runs on the controller machine
-      # Corrected 'when' condition as a single string
-      when: >
-        item.stdout is defined and
-        (item.stdout | length > 0) and
-        '"success": true' in item.stdout
+      # Only display output for successful runs (single-line condition)
+      when: item.stdout is defined and (item.stdout | length > 0) and ('"success": true' in item.stdout)
