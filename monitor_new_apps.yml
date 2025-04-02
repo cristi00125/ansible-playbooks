@@ -1,22 +1,43 @@
-- name: Monitor new/updated apps for API calls
+- name: Monitor new/updated apps for API calls and Log Results
   hosts: all
   gather_facts: false
   vars:
     monitor_script: "C:\\Users\\ansible\\Desktop\\Procmon\\monitorsingle.py"
     python_path: "C:\\Users\\ansible\\AppData\\Local\\Programs\\Python\\Python313\\python.exe"
+    # Define where logs will be saved on the Ansible controller machine 
+    log_directory_on_controller: "/home/peter/Desktop/Scripts/Logs"
 
   tasks:
 
+    - name: Ensure log directory exists on controller
+      file:
+        path: "{{ log_directory_on_controller }}"
+        state: directory
+      delegate_to: localhost 
+      run_once: true
+
     - name: Monitor API calls for each changed app
       win_command: >
-        {{ python_path }} {{ monitor_script }} "{{ item.name }}"
+        "{{ python_path }}" "{{ monitor_script }}" "{{ item.name }}"
       register: monitor_output
       loop: "{{ changes | default([]) }}"
       loop_control:
         label: "{{ item.name }}"
       changed_when: false
 
-    - name: Show API results
-      debug:
-        msg: "{{ item.stdout | from_json }}"
+    - name: Save successful API results to controller log file
+      copy:
+        content: "{{ item.stdout }}"
+        dest: "{{ log_directory_on_controller }}/{{ item.item.name | regex_replace('[^a-zA-Z0-9_.-]+', '_') }}.json"
       loop: "{{ monitor_output.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      delegate_to: localhost
+      when:
+        - item.stdout is defined
+        - item.stdout | length > 0
+        - '"success": true' in item.stdout
+
+    #     msg: "Processed {{ monitor_output.results | length }} applications. Check '{{ log_directory_on_controller }}' for logs."
+    #   run_once: true
+    #   delegate_to: localhost
