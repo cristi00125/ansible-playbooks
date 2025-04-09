@@ -1,0 +1,125 @@
+---
+- name: Localized Yara Scan Triggered by Centralized Behavioural Analysis
+  # This playbook performs localized static analysis (Yara scan) on a specific file
+  # on an endpoint. It's intended to be triggered by a centralized SIEM/analysis
+  # system (like the Orin script watching logs) when potentially suspicious behavior
+  # involving that file is detected. While the initial trigger might be rule-based,
+  # this mechanism supports more advanced AI/ML-driven triggers identifying anomalies.
+  hosts: "{{ target_host_ip | default('localhost') }}" # Dynamically set by AWX extra_vars (Limit field)
+  become: yes # Required for package installation and potentially accessing files
+  gather_facts: no # Optimize speed, facts not strictly needed here
+
+  vars:
+    # --- Variables expected via AWX extra_vars ---
+    # file_to_scan: # Mandatory, e.g., "/usr/bin/wget" provided by trigger script
+    # target_host_ip: # Mandatory, e.g., "192.168.190.33" provided by trigger script
+
+    # --- Configuration: Paths on the AWX Node (Security VM) ---
+    # Define the location of Yara rules *ON THE AWX/TOWER NODE* that Ansible runs from.
+    # *** ADJUST THIS PATH to where your rules actually reside on the Security VM ***
+    yara_rules_src_dir_on_awx_node: "/opt/ansible_projects/yara_rules/behaviour_response"
+
+    # --- Internal Playbook Vars ---
+    # Temporary location for rules on the target machine
+    yara_rules_dest_dir_on_target: "/tmp/ansible_yara_rules_{{ ansible_date_time.epoch }}"
+    # Yara executable name/path on target
+    yara_executable_on_target: "yara"
+
+  pre_tasks:
+    - name: Validate mandatory input variables
+      ansible.builtin.assert:
+        that:
+          - file_to_scan is defined
+          - file_to_scan | length > 0
+          - target_host_ip is defined # Although host targeting handles this implicitly
+        fail_msg: "Mandatory variable 'file_to_scan' must be provided via AWX extra_vars."
+        quiet: yes
+
+  tasks:
+    - name: "Setup Phase: Ensure Yara package is present on target '{{ inventory_hostname }}'"
+      ansible.builtin.package:
+        name: "{{ yara_executable_on_target }}" # Usually package name matches executable
+        state: present
+      register: pkg_result
+      # Avoid failing if already installed or package manager doesn't find it (e.g., compiled manually)
+      failed_when: pkg_result is failed and "No package matching" not in pkg_result.msg | default('') and "Nothing to do" not in pkg_result.msg | default('')
+
+    - name: "Setup Phase: Verify Yara executable exists on target"
+      ansible.builtin.command: "which {{ yara_executable_on_target }}"
+      register: yara_which_check
+      changed_when: false
+      failed_when: false # Don't fail playbook here, let scan task handle it
+      check_mode: no # Always run this check
+
+    - name: "Setup Phase: Create temporary directory for Yara rules on target"
+      ansible.builtin.file:
+        path: "{{ yara_rules_dest_dir_on_target }}"
+        state: directory
+        mode: '0700'
+      when: yara_which_check.rc == 0 # Only if 'which yara' succeeded
+
+    - name: "Setup Phase: Copy Yara rules from AWX node to target"
+      # This transfers the relevant Yara rules for behaviour-triggered scans
+      # from the central management node (AWX) to the target for localized processing.
+      ansible.builtin.copy:
+        src: "{{ yara_rules_src_dir_on_awx_node }}/" # Trailing / copies directory contents
+        dest: "{{ yara_rules_dest_dir_on_target }}/"
+        mode: '0600'
+      register: copy_result
+      when: yara_which_check.rc == 0
+      # Add error handling if source dir doesn't exist on AWX node? Maybe assert earlier.
+
+    - name: "Analysis Phase: Check if target file '{{ file_to_scan }}' exists"
+      ansible.builtin.stat:
+        path: "{{ file_to_scan }}"
+      register: file_stat
+      when: yara_which_check.rc == 0 and copy_result is succeeded # Only if setup steps worked
+
+    - name: "Analysis Phase: Execute Yara scan (Localized Processing)"
+      # Runs Yara against the specific file identified by the behavioral trigger.
+      # This provides ground-truth static analysis of the tool involved.
+      ansible.builtin.command:
+        # -w: disable warnings, -r: recursive (if needed, not for single file), use compiled rules for speed if many rules
+        cmd: "{{ yara_executable_on_target }} -w {{ yara_rules_dest_dir_on_target }}/ {{ file_to_scan }}"
+      register: yara_result
+      failed_when: yara_result.rc > 1 # Yara exits 0=no matches, 1=matches, >1=error
+      changed_when: false # This task only reads data, doesn't change state
+      when:
+        - yara_which_check.rc == 0
+        - copy_result is succeeded
+        - file_stat.stat is defined and file_stat.stat.exists and file_stat.stat.isreg # Target file exists and is a regular file
+
+    - name: "Reporting Phase: Display Yara Scan Results (if matches or errors)"
+      # Feeds the results of the localized scan back to the central logs (AWX output).
+      ansible.builtin.debug:
+        msg:
+          - "YARA Scan Result on {{ inventory_hostname }} for file: {{ file_to_scan }}"
+          - "Triggered by: Centralized Behaviour Monitoring"
+          - "Scan Command: {{ yara_result.cmd | default('N/A') }}"
+          - "Return Code: {{ yara_result.rc }}"
+          - "Matches/Output (stdout):"
+          - "{{ yara_result.stdout | default('(No Matches Found)') }}"
+          - "Errors (stderr): {{ yara_result.stderr | default('(No Errors)') }}"
+      when: yara_result is defined and (yara_result.rc != 0 or yara_result.stderr | length > 0)
+
+    - name: "Reporting Phase: Note if target file was not found/scannable"
+      ansible.builtin.debug:
+        msg: "YARA Scan Skipped on {{ inventory_hostname }}: Target file '{{ file_to_scan }}' not found, not a regular file, or prerequisite step failed."
+      when: yara_result is not defined or yara_result is skipped or (yara_result is defined and yara_result.rc > 1 and "No such file or directory" in yara_result.stderr | default('')) # Adjust condition based on yara exact error
+
+    - name: "Reporting Phase: Note if Yara executable was not found"
+      ansible.builtin.debug:
+        msg: "YARA Scan Failed on {{ inventory_hostname }}: '{{ yara_executable_on_target }}' command not found on target system."
+      when: yara_which_check.rc != 0
+
+  post_tasks:
+    - name: "Cleanup Phase: Remove temporary Yara rules directory from target"
+      ansible.builtin.file:
+        path: "{{ yara_rules_dest_dir_on_target }}"
+        state: absent
+      when:
+        # Ensure the path is defined and looks like the temporary path for safety
+        - yara_rules_dest_dir_on_target is defined
+        - yara_rules_dest_dir_on_target.startswith('/tmp/')
+      # Run even if prior tasks failed, to ensure cleanup happens if dir was created
+      ignore_errors: yes # Don't fail playbook if cleanup fails
