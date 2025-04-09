@@ -14,7 +14,7 @@
 
     # --- Configuration: Paths on the TARGET Machine (Linux Desktop) ---
     # Define the location where Yara rules *already exist* on the target.
-    yara_rules_dir_on_target: "/home/peter/Desktop/scripts" # <<< PATH ON LINUX DESKTOP
+    yara_rules_dir_on_target: "/home/peter/Desktop/rules" # <<< PATH ON LINUX DESKTOP
 
     # --- Internal Playbook Vars ---
     yara_executable_on_target: "yara" # Adjust if needed
