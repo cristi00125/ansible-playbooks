@@ -17,7 +17,7 @@
     # --- Configuration: Paths on the AWX Node (Security VM) ---
     # Define the location of Yara rules *ON THE AWX/TOWER NODE* that Ansible runs from.
     # *** ADJUST THIS PATH to where your rules actually reside on the Security VM ***
-    yara_rules_src_dir_on_awx_node: "/Desktop/Scripts/Rules" # <<< NEW PATH
+    yara_rules_src_dir_on_awx_node: "/home/peter/Desktop/Scripts/Rules" # <<< NEW PATH
 
     # --- Internal Playbook Vars ---
     # Temporary location for rules on the target machine
