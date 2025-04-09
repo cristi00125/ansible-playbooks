@@ -7,7 +7,7 @@
   # this mechanism supports more advanced AI/ML-driven triggers identifying anomalies.
   hosts: "{{ target_host_ip | default('localhost') }}" # Dynamically set by AWX extra_vars (Limit field)
   become: yes # Required for package installation and potentially accessing files
-  gather_facts: no # Optimize speed, facts not strictly needed here
+  gather_facts: yes # Optimize speed, facts not strictly needed here
 
   vars:
     # --- Variables expected via AWX extra_vars ---
