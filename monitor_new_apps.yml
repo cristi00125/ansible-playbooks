@@ -1,40 +1,22 @@
 - name: Monitor new/updated apps for API calls and Show Results
-  hosts: all # Targets your Windows hosts defined in inventory
+  hosts: all
   gather_facts: false
   vars:
-    # Paths on the remote Windows target host
     monitor_script: "C:\\Users\\ansible\\Desktop\\Procmon\\monitorsingle.py"
     python_path: "C:\\Users\\ansible\\AppData\\Local\\Programs\\Python\\Python313\\python.exe"
-    # No 'changes_file_path' needed here if using extra_vars
-
   tasks:
-    # No file loading tasks needed here
-
-    # --- Tasks running on the remote Windows host(s) ---
-
     - name: Monitor API calls for each changed app
-      # Executes the python script on the remote Windows host for each app.
       win_command: >
         "{{ python_path }}" "{{ monitor_script }}" "{{ item.name }}"
-      register: monitor_output # Captures the output (stdout, stderr, rc)
-      # Loops directly over the 'changes' variable (passed via extra_vars)
-      loop: "{{ changes | default([]) }}" # Use default just in case extra_vars isn't passed
+      register: monitor_output
+      loop: "{{ changes | default([]) }}"
       loop_control:
-        label: "{{ item.name }}" # Display app name in Ansible output for this task
-      changed_when: false # This task doesn't change the target's state
-      # Optional: fail if the script reports failure
-      # failed_when: "'\"success\": false' in item.stdout"
-
-    # --- Task to display the results in Ansible output ---
-
+        label: "{{ item.name }}
+      changed_when: false 
     - name: Show ALL API results (including potential errors/empty)
-      # Prints the standard output (JSON string) from the script to the console.
       debug:
-        msg: "{{ item.stdout | default('') }}" # Display the raw output, default to empty string if undefined
-      # Loops over the results captured by 'register: monitor_output'.
+        msg: "{{ item.stdout | default('') }}"
       loop: "{{ monitor_output.results }}"
       loop_control:
-        # Display app name in Ansible output for this task.
-        # 'item.item' refers back to the original item from the 'changes' loop.
         label: "{{ item.item.name }}"
-      # No 'when:' condition here - will run for every item
+        
