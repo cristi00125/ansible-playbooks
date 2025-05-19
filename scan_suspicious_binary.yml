@@ -49,11 +49,11 @@
       register: file_stat
       when: yara_which_check.rc == 0
     
-    - name: "Execute Yara scan (Using specific rule file on target)"
+    - name: "Execute Yara scan"
       ansible.builtin.command:
         cmd: "{{ yara_executable_on_target }} {{ yara_rule_full_path }} {{ file_to_scan }}"
       register: yara_result
-      failed_when: yara_result.rc > 1 or (yara_result.stdout | length == 0)
+      failed_when: yara_result.rc > 1
       changed_when: false
       when:
         - yara_which_check.rc == 0
