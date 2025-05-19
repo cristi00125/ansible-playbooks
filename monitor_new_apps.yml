@@ -5,6 +5,7 @@
     monitor_script: "C:\\Users\\ansible\\Desktop\\Procmon\\monitorsingle.py"
     python_path: "C:\\Users\\ansible\\AppData\\Local\\Programs\\Python\\Python313\\python.exe"
   tasks:
+  
     - name: Monitor API calls for each changed app
       win_command: >
         "{{ python_path }}" "{{ monitor_script }}" "{{ item.name }}"
@@ -13,7 +14,8 @@
       loop_control:
         label: "{{ item.name }}
       changed_when: false 
-    - name: Show ALL API results (including potential errors/empty)
+      
+    - name: Show API results
       debug:
         msg: "{{ item.stdout | default('') }}"
       loop: "{{ monitor_output.results }}"
