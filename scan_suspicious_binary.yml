@@ -48,7 +48,7 @@
         path: "{{ file_to_scan }}"
       register: file_stat
       when: yara_which_check.rc == 0
-
+    
     - name: "Analysis Phase: Execute Yara scan (Using specific rule file on target)"
       ansible.builtin.command:
         cmd: "{{ yara_executable_on_target }} {{ yara_rule_full_path }} {{ file_to_scan }}"
@@ -59,7 +59,7 @@
         - yara_which_check.rc == 0
         - rule_file_stat.stat is defined and rule_file_stat.stat.exists and rule_file_stat.stat.isreg
         - file_stat.stat is defined and file_stat.stat.exists and file_stat.stat.isreg
-
+   
     - name: "Reporting Phase: Display Yara Scan Results (if matches or errors)"
       ansible.builtin.debug:
         msg:
@@ -68,10 +68,9 @@
           - "Using Rule File From Target Path: {{ yara_rule_full_path }}" 
           - "Scan Command: {{ yara_result.cmd | default('N/A') }}"
           - "Return Code: {{ yara_result.rc }}"
-          - "Matches/Output (stdout):"
-          - "{{ yara_result.stdout | default('(No Matches Found)') }}"
+          - "Matches/Output (stdout): {{ yara_result.stdout | default('(No Matches Found)') }}"
           - "Errors (stderr): {{ yara_result.stderr | default('(No Errors)') }}"
-      when: yara_result is defined and (yara_result.rc != 0 or yara_result.stderr | length > 0)
+      when: yara_result is defined
 
     - name: "Reporting Phase: Note if target file was not found/scannable"
       ansible.builtin.debug:
