@@ -9,7 +9,8 @@
 
     - name: Monitor API calls for each changed app
       win_command: >
-        "{{ python_path }}" "{{ monitor_script }}" "{{ item.name }}"
+        "{{ python_path }}" "{{ monitor_script }}"
+        "{{ item.name }}" "{{ item.location }}\{{ item.name }}.exe"
       register: monitor_output
       loop: "{{ changes | default([]) }}"
       loop_control:
