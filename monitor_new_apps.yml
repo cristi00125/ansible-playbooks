@@ -8,14 +8,16 @@
   tasks:
     - name: Monitor API calls for each changed app
       win_command: >
-        "{{ python_path }}" "{{ monitor_script }}"
-        "{{ item.name }}" "{{ item.location }}\\{{ item.name }}.exe"
+        "{{ python_path }}"
+        "{{ monitor_script }}"
+        "{{ item.name }}"
+        "{{ item.location }}"
       register: monitor_output
       loop: "{{ changes | default([]) }}"
       loop_control:
         label: "{{ item.name }}"
       changed_when: false
-
+    
     - name: Show API results
       debug:
         msg: "{{ item.stdout | default('') }}"
